@@ -33,6 +33,7 @@ $gradeitems = $DB->get_records('grade_items', [
     'courseid' => $courseid,
     'itemtype' => 'mod'
 ]);
+
 $finalitem = $DB->get_record('grade_items', [
     'courseid' => $courseid,
     'itemtype' => 'course'
@@ -47,9 +48,17 @@ if (empty($gradeitems) && !$finalitem) {
     exit;
 }
 
-// Obtener usuarios inscritos
-$users = get_enrolled_users($context, '', 0, 'u.id, u.firstname, u.lastname, u.email');
+// Obtener usuarios inscritos con rol de estudiante
+$allusers = get_enrolled_users($context, '', 0, 'u.id, u.firstname, u.lastname, u.email');
+$studentrole = $DB->get_record('role', ['shortname' => 'student']);
+$users = [];
 
+foreach ($allusers as $user) {
+    // Verifica si tiene el rol student en este contexto
+    if (user_has_role_assignment($user->id, $studentrole->id, $context->id)) {
+        $users[] = $user;
+    }
+}
 // Columnas disponibles
 $available_columns = ['fullname' => 'Nombre Estudiante', 'email' => 'Correo'];
 foreach ($gradeitems as $item) {
@@ -61,12 +70,13 @@ if ($finalitem) {
 
 // Columnas por defecto
 $default_columns = ['fullname' => 1];
-$count = 0;
 foreach ($gradeitems as $item) {
-    if ($count < 3) {
+    if (stripos($item->itemname, 'examen') !== false) {
         $default_columns['gradeitem_' . $item->id] = 1;
-        $count++;
     }
+}
+if ($finalitem) {
+    $default_columns['gradeitem_' . $finalitem->id] = 1;
 }
 
 // Determinar columnas seleccionadas
@@ -163,7 +173,7 @@ echo $OUTPUT->header();
 ?>
 
 <div class="container mt-4">
-    <h3>Enviar calificaciones por actividad del curso</h3>
+    <h3>Enviar calificaciones del curso</h3>
 
     <?php if ($sent): ?>
         <div class="alert alert-success">
@@ -215,28 +225,32 @@ echo $OUTPUT->header();
             <button type="submit" class="btn btn-outline-primary mb-4">🔍 Actualizar vista previa</button>
         <?php endif; ?>
 
-        <div class="table-responsive">
-            <table class="table table-bordered">
-                <thead class="thead-light">
-                    <tr>
-                        <?php foreach ($available_columns as $key => $label): ?>
-                            <?php if (!empty($selectedcols[$key])): ?>
-                                <th><?php echo $label; ?></th>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($previewrows as $r): ?>
-                        <tr>
-                            <?php foreach ($r as $col): ?>
-                                <td><?php echo s($col); ?></td>
-                            <?php endforeach; ?>
-                        </tr>
+<div class="table-wrapper" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+    <table class="table table-bordered table-striped mb-0" style="border-collapse: separate; border-spacing: 0;">
+        <thead class="thead-light">
+            <tr>
+                <?php foreach ($available_columns as $key => $label): ?>
+                    <?php if (!empty($selectedcols[$key])): ?>
+                        <th style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 1;">
+                            <?php echo $label; ?>
+                        </th>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($previewrows as $r): ?>
+                <tr>
+                    <?php foreach ($r as $col): ?>
+                        <td><?php echo s($col); ?></td>
                     <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
+
 
         <?php
         $correo_predeterminado = 'jefe.carrera@ejemplo.com';
@@ -264,6 +278,15 @@ echo $OUTPUT->header();
 
         <button type="submit" name="sendemail" class="btn btn-success">✉️ Enviar correo con archivo generado</button>
     </form>
+    <script>
+    // Envía el formulario automáticamente al cambiar cualquier checkbox
+    document.querySelectorAll('input[type=checkbox][name^="columns"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            cb.closest('form').submit();
+        });
+    });
+</script>
+
 </div>
 
 <?php echo $OUTPUT->footer(); ?>
