@@ -268,7 +268,7 @@ echo $OUTPUT->header();
 
         <div class="mb-3">
             <label for="subject" class="form-label">Asunto</label>
-            <input type="text" class="form-control" id="subject" name="subject" required value="Calificaciones del curso <?php echo $course->fullname; ?>">
+            <input type="text" class="form-control" id="subject" name="subject" required value="Calificaciones del curso <?php echo s($course->fullname); ?>">
         </div>
 
         <div class="mb-3">
